@@ -1,0 +1,42 @@
+*copilot.txt*  工蜂Copilot - 您的 AI 结对编程伴侣
+
+GETTING STARTED                                 *copilot*
+
+COMMANDS                                        *:Copilot*
+
+                                                *:Copilot_disable*
+:Copilot setup        			    登录
+
+                                                *:Copilot_setup*
+:Copilot disable        			禁用补全
+
+                                                *:Copilot_enable*
+:Copilot enable         			启动补全（默认）
+
+                                                *:Copilot_status*
+:Copilot status         			检查插件补全禁用状态
+
+OPTIONS                                         *copilot-options*
+
+                                                *b:copilot_completion_enabled*
+g:copilot_completion_enabled       			设置全局变量 0 ｜ 1，开启禁用全局补全
+
+
+:Copilot log        			    日志
+
+                                                *:Copilot_log*
+
+
+KEYBORDING				        *copilot-keyboarding*
+
+                                                *copilot-i_tab*
+<tab>                   			全部补全
+
+                                                *copilot-i_CTRL-SHIFT-Right*
+<S-C-Right>               			按词补全
+
+                                                *copilot-i_ALT-CTRL-Right*
+<M-C-Right>             			按行补全
+
+                                                *copilot-i_CTRL-SHIFT-Down*
+<S-C-Down>             			    主动触发

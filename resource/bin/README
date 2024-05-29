@@ -1,0 +1,5 @@
+# 二进制说明
+这里存放各个平台的【language-server-xxx】二进制，不用加文件夹
+
+# dist文件说明
+如果想要用js产物，直接将【dist】产物放在【resource】目录下，修改【agent.js】文件的【is_js】属性，改为【is_js == 1】
