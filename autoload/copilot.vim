@@ -49,7 +49,8 @@ function! s:BufferDisabled() abort
 endfunction
 
 function! copilot#Init(...) abort
-	call copilot#util#Defer({ -> exists('s:agent') || s:Start() })
+  call copilot#logger#Info("Init")
+  call copilot#util#Defer({ -> exists('s:agent') || s:Start() })
 endfunction
 
 function! s:Running() abort
@@ -72,7 +73,6 @@ function! s:Attach(bufnr, ...) abort
 	try
 		return copilot#Agent().Attach(a:bufnr)
 	catch
-		" 报告错误
 	endtry
 endfunction
 
@@ -165,7 +165,6 @@ function! s:UpdatePreview() abort
 				endif
 			endif
 	catch
-		" 报告错误
 	endtry
 endfunction
 
@@ -180,7 +179,7 @@ function! s:SuggestionTextWithAdjustments() abort
 		endif
 		let choice = get(b:_copilot.suggestions, b:_copilot.choice, {})
 		if has_key(choice, 'insertText')
-			let choice.text = choice.insertText
+			let choice.text = substitute(choice.insertText, '\r', '', '')
 		endif
 		if !has_key(choice, 'range') || choice.range.start.line != line('.') - 1 || type(choice.text) !=# v:t_string
 			return ['', 0, 0, '']
@@ -205,7 +204,6 @@ function! s:SuggestionTextWithAdjustments() abort
 			return [strpart(choice_text, offset), 0, strchars(delete), uuid]
 		endif
 	catch
-		" 报告错误
 	endtry
 	return ['', 0, 0, '']
 endfunction
@@ -271,7 +269,6 @@ function! copilot#Complete(...) abort
 endfunction
 
 function! s:Trigger(bufnr, timer) abort
-  " 禁用就不要触发了
   if exists('g:copilot_completion_enabled') &&  empty(g:copilot_completion_enabled)
     return
   endif
@@ -309,12 +306,6 @@ endfunction
 function! copilot#Accept(...) abort
 	let s = copilot#GetDisplayedSuggestion()
 	if !empty(s.text)
-    if !a:0
-      call copilot#lsp#AcceptCompletionAll()
-    else
-      call copilot#lsp#AcceptCompletionPart()
-    endif
-		unlet! b:_copilot
 		let text = ''
 		if a:0 > 1
 			let text = substitute(matchstr(s.text, "\n*" . '\%(' . a:2 .'\)'), "\n*$", '', '')
@@ -322,6 +313,12 @@ function! copilot#Accept(...) abort
 		if empty(text)
 			let text = s.text
 		endif
+    if !a:0
+      call copilot#lsp#AcceptCompletionAll()
+    else
+      call copilot#lsp#AcceptCompletionPart(text)
+    endif
+    unlet! b:_copilot
 		let acceptance = {'uuid': s.uuid}
 		if text !=# s.text
 			let acceptance.acceptedLength = copilot#doc#UTF16Width(text)
@@ -374,6 +371,10 @@ endfunction
 let s:commands = {}
 
 function! s:commands.setup(opts) abort
+  if !has('nvim-0.6') && v:version < 900
+      echo "Vim version too old,requires 9.0.0185 or higher"
+      return
+  endif
   let agent = copilot#Agent()
   call copilot#lsp#GetDeviceCode(agent)
 endfunction
@@ -383,6 +384,23 @@ function! s:commands.log(opts) abort
     echo g:copilot_log_file
   else
     echo 'Copilot log file not set'
+  endif
+endfunction
+
+function! s:commands.version(opts) abort
+  echo copilot#version#String()
+endfunction
+
+function! s:commands.update(opts) abort
+  if exists('g:copilot_new_version_params')
+    echo g:copilot_login_tip . " (New version found:" . g:copilot_new_version_params.version . ")"
+    if !has('win32')
+        echo "New version found:" . g:copilot_new_version_params.version . ",You can update by running:「curl -sL https://mirrors.tencent.com/repository/generic/gongfeng-copilot/vim/install.sh | sh」"
+      else
+        echo "New version found:" . g:copilot_new_version_params.version  . ",You can download latest version from:「https://mirrors.tencent.com/repository/generic/gongfeng-copilot/vim/gongfeng-copilot-vim-latest.tar.gz」"
+      endif
+  else
+    echo "Copilot is already up to date"
   endif
 endfunction
 
@@ -414,6 +432,16 @@ endfunction
 
 function! s:commands.help(opts) abort
   return a:opts.mods . ' help ' . (len(a:opts.arg) ? ':Copilot_' . a:opts.arg : 'copilot')
+endfunction
+
+function! copilot#CommandComplete(arg, lead, pos) abort
+  let args = matchstr(strpart(a:lead, 0, a:pos), 'C\%[opilot][! ] *\zs.*')
+  if args !~# ' '
+    return sort(filter(map(keys(s:commands), { k, v -> tr(v, '_', '-') }),
+          \ { k, v -> strpart(v, 0, len(a:arg)) ==# a:arg }))
+  else
+    return []
+  endif
 endfunction
 
 function! copilot#Command(line1, line2, range, bang, mods, arg) abort

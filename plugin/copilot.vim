@@ -1,3 +1,8 @@
+if exists('g:loaded_copilot')
+  finish
+endif
+let g:loaded_copilot = 1
+
 scriptencoding utf-8
 
 command! -bang -nargs=? -range=-1 -complete=customlist,copilot#CommandComplete Copilot exe copilot#Command(<line1>, <count>, +"<range>", <bang>0, "<mods>", <q-args>)

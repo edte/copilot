@@ -1,27 +1,19 @@
 @echo off
-echo begin
-set nvim_file_path=%USERPROFILE%\AppData\Local\nvim\pack\gongfeng
-if exist "%nvim_file_path%" (
-    rmdir /s /q "%nvim_file_path%"
-    if %errorlevel%==0 (
-        echo nvim deleted successfully.
-    ) else (
-        echo Failed to delete the file.
-    )
-) else (
-  echo nvim deleted successfully.
+set nvim_directory_path=%USERPROFILE%\AppData\Local\nvim\pack\gongfeng
+set vim_directory_path=%USERPROFILE%\vimfiles\pack\gongfeng
+
+echo Are you sure to remove: %nvim_directory_path% and %vim_directory_path% ?(y/n)
+set /p confirmation=
+if /I "%confirmation%"=="y" (
+  if exist "%nvim_directory_path%" (
+    rmdir /s /q "%nvim_directory_path%"
+    echo %nvim_directory_path% has been removed.
+  )
+  if exist "%vim_directory_path%" (
+    rmdir /s /q "%vim_directory_path%"
+    echo %vim_directory_path% has been removed.
+  )
 )
 
-set vim_file_path=%USERPROFILE%\vimfiles\pack\gongfeng
-if exist "%vim_file_path%" (
-    rmdir /s /q "%vim_file_path%"
-    if %errorlevel%==0 (
-        echo vim deleted successfully.
-    ) else (
-        echo Failed to delete the file.
-    )
-) else (
-  echo vim deleted successfully.
-)
-echo end
+echo Done.
 pause

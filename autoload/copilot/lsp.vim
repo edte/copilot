@@ -1,9 +1,8 @@
 scriptencoding utf-8
 
-let g:copilot_setup_tip = "Gongfeng Copilot：You can setup with command:Copilot setup"
-let g:copilot_login_tip = "Gongfeng Copilot：You can coding now!"
+let g:copilot_setup_tip = "Gongfeng Copilot:You can setup with command [:Copilot setup]"
+let g:copilot_login_tip = "Gongfeng Copilot:You can coding now!"
 
-" 忽略的语言
 function! copilot#lsp#GetFiletypeDefaults() abort
   let copilot_filetype_defaults = {
 	\ 'gitcommit': 0,
@@ -15,72 +14,63 @@ function! copilot#lsp#GetFiletypeDefaults() abort
   return copilot_filetype_defaults
 endfunction
 
-" 部分采纳
-function! copilot#lsp#AcceptCompletionPart() abort
+function! copilot#lsp#AcceptCompletionPart(snippet) abort
   let accept_method = 'gongfeng-notify/accept-completion-line'
-  call s:AcceptCompletion(accept_method)
+  call s:AcceptCompletion(accept_method,a:snippet)
 endfunction
 
-" 全采纳
 function! copilot#lsp#AcceptCompletionAll() abort
   let accept_method = 'gongfeng-notify/accept-completion'
   call s:AcceptCompletion(accept_method)
 endfunction
 
-" 采纳
-function! s:AcceptCompletion(accept_method) abort
+function! s:AcceptCompletion(accept_method,...) abort
   if (!exists('b:_copilot.suggestions') || !exists('b:_copilot.params'))
     return
   endif
   let choice = get(b:_copilot.suggestions, b:_copilot.choice, {})
   if has_key(choice, 'insertText')
     let choice.text = choice.insertText
+    let snippet = a:0 ? a:1 : choice.insertText
     let params = {
       \ 'completionId': choice.id,
-      \ 'snippet': choice.insertText,
+      \ 'snippet': snippet,
       \ 'uri': b:_copilot.params.uri,
       \ 'position': choice.range.start,
+      \ 'insertPosition': choice.range.start,
       \ }
     let agent = copilot#Agent()
     call copilot#agent#WholeNotify(agent,a:accept_method,params)
   endif
 endfunction
 
-" 代码补全
 function! copilot#lsp#Completion(params,...) abort
   let completion_method = 'gongfeng/stream-completions'
   return call('copilot#agent#WholeRequest', [completion_method, a:params] + a:000)
 endfunction
 
-" 主动更新配置信息
 function! copilot#lsp#ConfigUpdate(agent,enable) abort
   let g:copilot_completion_enabled = a:enable
   let config_method = 'gongfeng/update-config'
   call copilot#agent#WholeRequest(config_method,copilot#lsp#GetUpdateConfig(), function('s:ConfigUpdateSuccess'),function('s:ConfigUpdateError'),a:agent)
 endfunction
 
-" 更新配置成功
 function! s:ConfigUpdateSuccess(result, agent) abort
   "echom 'ConfigUpdateSuccess'
   "echom a:result
 endfunction
 
-" 更新配置成功
 function! s:ConfigUpdateError(result, agent) abort
   "echom 'ConfigUpdateError'
   "echom a:result
 endfunction
 
-" 成功初始化
 function! copilot#lsp#Initialized(agent,result) abort
   call copilot#logger#Info("[Response] " . json_encode(a:result))
-	" 发送初始化成功的通知
   call copilot#agent#WholeNotify(a:agent,'initialized',{})
-  " 读取缓存信息，开始登录
   call copilot#util#Defer({-> copilot#lsp#CheckConfig(a:agent)}) 
 endfunction
 
-" 获取设备码
 function! copilot#lsp#GetDeviceCode(agent) abort
 	let auth_method = 'gongfeng/oauth-device-code'
 	let params = {
@@ -89,14 +79,12 @@ function! copilot#lsp#GetDeviceCode(agent) abort
   call copilot#agent#WholeRequest(auth_method, params, function('s:GetDeviceCodeSuccess'),function('s:GetDeviceCodeError'),a:agent)
 endfunction
 
-" 获取设备码失败
 function! s:GetDeviceCodeError(result, agent) abort
   echo a:result
 endfunction
 
-" 获取设备码成功
 function! s:GetDeviceCodeSuccess(result, agent) abort
-  echo "First copy your one-time code: " . a:result.userCode . "\n" . "Visit " . a:result.verificationUri
+  echo "1.Copy your one-time code: " . a:result.userCode . "\n" . "2.Visit " . a:result.verificationUri . "\n" . "3.Press Enter here and wait for the login message."
 	let auth_method = 'gongfeng/oauth-device-token'
 	let params = {
 		\ 'deviceCode': a:result.deviceCode,
@@ -107,12 +95,10 @@ function! s:GetDeviceCodeSuccess(result, agent) abort
   call copilot#agent#WholeRequest(auth_method, params, function('s:GetTokenSuccess'),function('s:GetTokenError'),a:agent)
 endfunction
 
-" 获取token授权失败
 function! s:GetTokenError(result, agent) abort
   echo a:result
 endfunction
 
-" 获取token授权成功
 function! s:GetTokenSuccess(result, agent,...) abort
 	let auth_method = 'gongfeng/authentication'
 	let params = {
@@ -124,25 +110,25 @@ function! s:GetTokenSuccess(result, agent,...) abort
   call copilot#agent#WholeRequest(auth_method, params, function('s:AuthSuccess'),function('s:AuthError'),a:agent,params)
 endfunction
 
-"授权失败
 function! s:AuthError(result, agent,params) abort
   echo g:copilot_setup_tip
 endfunction
 
-" 授权成功
 function! s:AuthSuccess(result, agent,params) abort
-  echo g:copilot_login_tip
+  if exists('g:copilot_new_version_params')
+    echo g:copilot_login_tip . " (New version found:" . g:copilot_new_version_params.version . ")"
+  else
+    echo g:copilot_login_tip
+  endif
   let g:copilot_login = 1
   call copilot#lsp#ConfigUpdate(a:agent, g:copilot_completion_enabled)
 endfunction
 
-" 检测本地缓存，存在就登陆
 function! copilot#lsp#CheckConfig(agent) abort
   let config_method = 'gongfeng/update-config'
   call copilot#agent#WholeRequest(config_method, copilot#lsp#GetUpdateConfig(), function('s:GetConfigSuccess'),function('s:GetConfigError'),a:agent)
 endfunction
 
-" 授权成功
 function! s:GetConfigSuccess(result,agent) abort
   "echom "GetConfigSuccess"
   call copilot#logger#Debug(json_encode(a:result))
@@ -165,18 +151,21 @@ function! s:GetConfigSuccess(result,agent) abort
   endif
 endfunction
 
-" 登录失败，刷新token
+function! s:GetConfigErrorFirst(result,agent) abort
+  call copilot#agent#WholeNotify(a:agent,'initialized',{})
+  let config_method = 'gongfeng/update-config'
+  call copilot#util#Defer({-> copilot#agent#WholeRequest(config_method, copilot#lsp#GetUpdateConfig(), function('s:GetConfigSuccess'),function('s:GetConfigError'),a:agent)})
+endfunction
+
 function! s:GetConfigError(result,agent) abort
-  "echom "GetConfigError"
-  echo g:copilot_setup_tip
+  "echo g:copilot_setup_tip
 endfunction
 
 function! s:CheckConfigHandle(channel, msg)
    "echom "CheckConfigHandle"
    "echom a:msg
-endfunc
+endfunction
 
-" 登录失败，刷新token
 function! s:RefreshToken(result,agent,old_params) abort
 	let refresh_auth_method = 'gongfeng/refresh-token'
 	let params = {
@@ -186,12 +175,10 @@ function! s:RefreshToken(result,agent,old_params) abort
   call copilot#agent#WholeRequest(refresh_auth_method, params, function('s:GetTokenSuccess'),function('s:RefreshTokenError'),a:agent)
 endfunction
 
-" 刷新token失败
 function! s:RefreshTokenError(result, agent) abort
   echo g:copilot_setup_tip
 endfunction
 
-" 生成配置信息
 function! copilot#lsp#GetUpdateConfig() abort
 	let filetypes = copy(copilot#lsp#GetFiletypeDefaults())
 	if type(get(g:, 'copilot_filetypes')) == v:t_dict
@@ -215,7 +202,6 @@ function! copilot#lsp#GetUpdateConfig() abort
 	return editor_config
 endfunction
 
-" chmod +x 允许二进制
 function! copilot#lsp#EnablePermission(lsp_file_path) abort
   let chmodCmd = 'chmod +x ' . a:lsp_file_path
   let out = []

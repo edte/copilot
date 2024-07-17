@@ -242,6 +242,13 @@ function! s:NeoVimNotify(method, params) dict abort
 	return eval("v:lua.require'_copilot'.rpc_notify(self.id, a:method, a:params)")
 endfunction
 
+function! copilot#agent#LspHandle(agent_id, request) abort
+  if !has_key(s:instances, a:agent_id)
+    return
+  endif
+  return s:OnVimMessage(s:instances[a:agent_id], a:request)
+endfunction
+
 function! s:VimClose() dict abort
 	if !has_key(self, 'job')
 		return
@@ -268,10 +275,6 @@ let s:vim_capabilities = {
 	\ 'workspace': {'workspaceFolders': v:false},
 	\ 'window': {'showDocument': {'support': v:true}},
 	\ }
-
-let s:common_handlers = {
-	\ }
-
 
 function! s:JsCommand(is_debug,server_path) abort
 	if !has('nvim-0.6') && v:version < 900
@@ -325,24 +328,47 @@ function! s:JsCommand(is_debug,server_path) abort
 	return [node + agent + ['--stdio']+[a:is_debug == 0 ? "" : "--lsp-debug"], node_version.string, warning]
 endfunction
 
+function! s:LogMessage(params, agent) abort
+  " echom "LogMessage"
+endfunction
+
+function! s:NewVersion(params, agent) abort
+  " echom "NewVersion"
+endfunction
+
+function! s:Progress(params, agent) abort
+  if has_key(a:agent.progress, a:params.token)
+    " call a:agent.progress[a:params.token](a:params.value)
+  endif
+endfunction
+
+let s:notifications = {
+      \ '$/progress': function('s:Progress'),
+      \ 'gongfeng/server-log': function('s:LogMessage'),
+      \ 'gongfeng/new-version': function('s:NewVersion'),
+      \ }
+
 function! copilot#agent#New(...) abort
+	if exists("g:copilot_initialized")
+		call copilot#logger#Info("Copilot already initialized")
+		return
+	endif
+	call copilot#logger#Info("copilot#agent#New")
+	let g:copilot_initialized = 1
 	let opts = a:0 ? a:1 : {}
 	let instance = {
-		\ 'requests': {},
-		\ 'workspaceFolders': {},
-		\ 'status': {'status': 'Starting', 'message': ''},
-		\ 'Attach': function('s:AgentAttach'),
+    \ 'requests': {},
+    \ 'workspaceFolders': {},
+    \ 'status': {'status': 'Starting', 'message': ''},
+    \ 'Attach': function('s:AgentAttach'),
     \ 'Cancel': function('s:AgentCancel'),
     \ 'Call': function('s:AgentCall'),
-		\ }
-	let instance.methods = extend(copy(s:common_handlers), get(opts, 'methods', {}))
-	" 是否开启调试模式
+    \ }
+	let instance.methods = copy(s:notifications)
 	let is_debug = 0
-	" 是否开启js模式
 	let is_js = 0
 
 	if is_js == 1
-		" 运行js
 		 let s:lsp_file_path = s:root . '/resource/dist/server.js'
 		 let s:command =["node"]+ [s:lsp_file_path]+['--stdio']
 		let [s:command, node_version, command_error] = s:JsCommand(is_debug,s:lsp_file_path)
@@ -355,7 +381,7 @@ function! copilot#agent#New(...) abort
 			else
 			  let instance.node_version_warning = command_error
 			  echohl WarningMsg
-			  echomsg '工蜂Copilot: ' . command_error
+			  echomsg 'Gongfeng Copilot: ' . command_error
 			  echohl NONE
 			endif
 		  endif
@@ -367,7 +393,6 @@ function! copilot#agent#New(...) abort
       echoerr "Vim version too old,requires 9.0.0185 or higher"
       return
     endif
-		" 运行二进制
 		let s:lsp_file_name = "language-server-linux-x64"
 		if has('win32')
 			let s:lsp_file_name = "language-server-win-x64.exe"
@@ -400,7 +425,7 @@ function! copilot#agent#New(...) abort
 	let opts.workspaceFolders = []
 	let settings = {}
 	if has('nvim')
-    let opts.clientInfo = { 'name': 'nvim', 'version': s:ide_version }
+    let opts.clientInfo = { 'name': 'NeoVim', 'version': s:ide_version }
 		let instance.open_buffers = {}
 		call extend(instance, {
 			\ 'Close': function('s:NeoVimClose'),
@@ -411,7 +436,7 @@ function! copilot#agent#New(...) abort
 		let instance.client_id = eval("v:lua.require'_copilot'.lsp_start_client(s:command, keys(instance.methods), opts, settings)")
 		let instance.id = instance.client_id
 	else
-    let opts.clientInfo = { 'name': 'vim', 'version': s:ide_version }
+    let opts.clientInfo = { 'name': 'Vim', 'version': s:ide_version }
 		let state = {'headers': {}, 'mode': 'headers', 'buffer': ''}
     call extend(instance, {
       \ 'Notify': function('s:VimNotify'),
@@ -432,11 +457,11 @@ function! copilot#agent#New(...) abort
 		let opts.processId = getpid()
 		let request = instance.Request('initialize', opts, function('s:VimInitializeResult'), function('s:VimInitializeError'), instance)
     let instance.initialization_pending = []
-    let lspRequest = {
+    let initialize_request = {
 		\ 'method': "initialize",
 		\ 'params': opts
 		\ }
-    call copilot#logger#Info("[Request] " . json_encode(lspRequest))
+    call copilot#logger#Info("[Request] " . json_encode(initialize_request))
 	endif
 	let s:instances[instance.id] = instance
 	return instance
@@ -446,12 +471,12 @@ function! s:OnVimMessage(agent, body, ...) abort
 	if !has_key(a:body, 'method')
 		return s:OnWholeResponse(a:agent, a:body)
 	endif
-  " 通知
-  "echom json_encode(a:body)
   call copilot#logger#Info("[Notify]" . json_encode(a:body))
+  if a:body.method ==# 'gongfeng/new-version'
+    let g:copilot_new_version_params = a:body.params
+  endif
 endfunction
 
-" Vim发送，带返回结果
 function! s:VimSendWithResult(agent, request) abort
 	try
 		call ch_sendexpr(a:agent.job, a:request)
@@ -468,7 +493,6 @@ function! s:VimSendWithResult(agent, request) abort
 	endtry
 endfunction
 
-" 统一的通知
 function! copilot#agent#WholeNotify(agent,method, params) abort
   let lspRequest = {
 		\ 'method': a:method,
@@ -478,7 +502,6 @@ function! copilot#agent#WholeNotify(agent,method, params) abort
   return call(a:agent.Notify, [a:method, a:params])
 endfunction
 
-" 统一的请求
 function! copilot#agent#WholeRequest(method, params, ...) abort
   let lspRequest = {
 		\ 'method': a:method,
@@ -489,7 +512,6 @@ function! copilot#agent#WholeRequest(method, params, ...) abort
   return call(agent.Request, [a:method, a:params] + a:000)
 endfunction
 
-" Vim/NeoVim 统一数据回调
 function! s:OnWholeResponse(agent, response, ...) abort
 	let response = a:response
 	let id = get(a:response, 'id', v:null)
@@ -545,7 +567,6 @@ function! s:Callback(request, type, callback, timer) abort
 endfunction
 
 function! s:OnVimExit(agent, code, ...) abort
-  echoerr 'lsp exited with status ' . a:code
   call copilot#logger#Warn('lsp exited with status ' . a:code)
 endfunction
 
@@ -563,7 +584,6 @@ function! copilot#agent#NeoVimInit(agent_id, initialize_result) abort
 endfunction
 
 function! copilot#agent#NeoVimExit(agent_id, code, signal) abort
-  echom "NeoVimExit:" . a:code . " sinal:" . a:signal
 	if !has_key(s:instances, a:agent_id)
 		return
 	endif
@@ -591,7 +611,19 @@ function! s:GetNodeVersion(command) abort
 	return {'status': status, 'string': string, 'major': major, 'minor': minor}
 endfunction
 
-"vim 初始化成功
+function! s:NeoVimInitializeResult(result, agent) abort
+	call copilot#lsp#Initialized(a:agent,a:result)
+endfunction
+
+function! s:NeoVimInitializeError(result, agent) abort
+  if a:error.code == s:error_exit
+		let a:agent.startup_error = 'Agent exited with status ' . a:error.data.status
+	else
+		let a:agent.startup_error = 'Unexpected error ' . a:error.code . ' calling agent: ' . a:error.message
+		call a:agent.Close()
+	endif
+endfunction
+
 function! s:VimInitializeResult(result, agent) abort
 	call copilot#lsp#Initialized(a:agent,a:result)
 	for request in remove(a:agent, 'initialization_pending')
@@ -599,7 +631,6 @@ function! s:VimInitializeResult(result, agent) abort
 	endfor
 endfunction
 
-" vim 初始化失败
 function! s:VimInitializeError(error, agent) abort
 	if a:error.code == s:error_exit
 		let a:agent.startup_error = 'Agent exited with status ' . a:error.data.status

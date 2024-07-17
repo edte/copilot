@@ -25,6 +25,12 @@ g:copilot_completion_enabled       			设置全局变量 0 ｜ 1，开启禁用�
 :Copilot log        			    日志
 
                                                 *:Copilot_log*
+:Copilot version        			版本
+
+                                                *:Copilot_version*
+:Copilot update        			  检查更新
+
+                                                *:Copilot_update*
 
 
 KEYBORDING				        *copilot-keyboarding*
