@@ -31,24 +31,21 @@ function! copilot#logger#Raw(level, message) abort
     endif
     call map(lines, { k, L -> type(L) == v:t_func ? call(L, []) : L })
     call extend(s:logs, lines)
-    let overflow = len(s:logs) - get(g:, 'copilot_log_history', 10000)
+    let overflow = len(s:logs) - get(g:, 'copilot_log_history', 500)
     if overflow > 0
       call remove(s:logs, 0, overflow - 1)
     endif
-    call writefile(s:logs, g:copilot_log_file)
-    "let bufnr = bufnr('copilot:///log')
-    "if bufnr > 0 && bufloaded(bufnr)
-    "  call setbufvar(bufnr, '&modifiable', 1)
-    "  call setbufline(bufnr, 1, s:logs)
-    "  call setbufvar(bufnr, '&modifiable', 0)
-    "  for winid in win_findbuf(bufnr)
-    "    if has('nvim') && winid != win_getid()
-    "      call nvim_win_set_cursor(winid, [len(s:logs), 0])
-    "    endif
-    "  endfor
-    "endif
+	  let delay = 5000
+	  call timer_stop(get(g:, '_copilot_log_timer', -1))
+	  let g:_copilot_log_timer = timer_start(delay, function('s:CopilotWriteFile'))
   catch
   endtry
+endfunction
+
+
+function! s:CopilotWriteFile(timer) abort
+	call writefile(s:logs, g:copilot_log_file)
+  unlet! g:_copilot_log_timer
 endfunction
 
 function! copilot#logger#Debug(...) abort

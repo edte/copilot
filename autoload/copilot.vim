@@ -282,7 +282,7 @@ endfunction
 
 function! copilot#Schedule(...) abort
 	call s:UpdatePreview()
-	let delay = a:0 ? a:1 : get(g:, 'copilot_idle_delay', 15)
+	let delay = a:0 ? a:1 : get(g:, 'copilot_idle_delay', 30)
 	call timer_stop(get(g:, '_copilot_timer', -1))
 	let g:_copilot_timer = timer_start(delay, function('s:Trigger', [bufnr('')]))
 endfunction
