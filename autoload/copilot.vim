@@ -49,7 +49,6 @@ function! s:BufferDisabled() abort
 endfunction
 
 function! copilot#Init(...) abort
-  call copilot#logger#Info("Init")
   call copilot#util#Defer({ -> exists('s:agent') || s:Start() })
 endfunction
 
@@ -61,7 +60,14 @@ function! s:Start() abort
 	if s:Running()
 			return
 	endif
+	let delay = 1000
+	call timer_stop(get(g:, '_copilot_start_timer', -1))
+	let g:_copilot_start_timer = timer_start(delay, function('s:CopilotNew'))
+endfunction
+
+function! s:CopilotNew(timer) abort
 	let s:agent = copilot#agent#New()
+	unlet! g:_copilot_start_timer
 endfunction
 
 function! copilot#Agent() abort

@@ -107,18 +107,20 @@ function! s:GetTokenSuccess(result, agent,...) abort
 		\ }
   let g:copilot_token = a:result.accessToken
   let g:copilot_user = a:result.username
-  call copilot#agent#WholeRequest(auth_method, params, function('s:AuthSuccess'),function('s:AuthError'),a:agent,params)
+  call copilot#agent#WholeRequest(auth_method, params, function('s:AuthSuccess'), function('s:AuthError'), a:agent, params, v:true)
 endfunction
 
-function! s:AuthError(result, agent,params) abort
+function! s:AuthError(result, agent, params, first) abort
   echo g:copilot_setup_tip
 endfunction
 
-function! s:AuthSuccess(result, agent,params) abort
+function! s:AuthSuccess(result, agent, params, first) abort
   if exists('g:copilot_new_version_params')
     echo g:copilot_login_tip . " (New version found:" . g:copilot_new_version_params.version . ")"
   else
-    echo g:copilot_login_tip
+    if a:first
+      echo g:copilot_login_tip
+    endif
   endif
   let g:copilot_login = 1
   call copilot#lsp#ConfigUpdate(a:agent, g:copilot_completion_enabled)
@@ -145,7 +147,7 @@ function! s:GetConfigSuccess(result,agent) abort
       \ 'token': a:result.token,
       \ 'user': a:result.user,
       \ }
-      call copilot#agent#WholeRequest(auth_method, params, function('s:AuthSuccess'),function('s:RefreshToken'),a:agent,params)
+      call copilot#agent#WholeRequest(auth_method, params, function('s:AuthSuccess'),function('s:RefreshToken'),a:agent,params,v:false)
 	else
     echo g:copilot_setup_tip
   endif

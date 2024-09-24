@@ -272,8 +272,7 @@ function! copilot#agent#Cancel(request) abort
 endfunction
 
 let s:vim_capabilities = {
-	\ 'workspace': {'workspaceFolders': v:false},
-	\ 'window': {'showDocument': {'support': v:true}},
+	\ 'workspace': {'workspaceFolders': v:true}
 	\ }
 
 function! s:JsCommand(is_debug,server_path) abort
@@ -420,7 +419,7 @@ function! copilot#agent#New(...) abort
 	let opts = {}
 	let opts = {
 		\ 'capabilities': {},
-		\ 'initializationOptions': { 'pluginVersion': s:plugin_version, 'token': '' },
+		\ 'initializationOptions': { 'pluginVersion': s:plugin_version},
 		\ }
 	let opts.workspaceFolders = []
 	let settings = {}

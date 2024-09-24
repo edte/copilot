@@ -89,7 +89,7 @@ function! copilot#doc#Get() abort
 		\ 'bufnr': bufnr(''),
 		\ 'uri': s:UriFromBufnr(bufnr('')),
 		\ 'version': getbufvar('', 'changedtick'),
-		\ 'insertSpaces': &expandtab ? v:true : v:false,
+		\ 'insertSpaces': v:true,
 		\ 'tabSize': shiftwidth(),
 		\ 'indentSize': shiftwidth(),
 		\ }
